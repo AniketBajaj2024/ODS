@@ -10,7 +10,10 @@ import base64
 import logging
 import threading
 from typing import Optional
-from concurrent.futures import ThreadPoolExecutor
+# concurrent.futures.TimeoutError is only an alias of the builtin TimeoutError
+# on Python 3.11+. This image is python:3.10, where it subclasses Exception
+# instead, so it must be caught by name or it falls through to the 500 branch.
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import soundfile as sf
 from fastapi import FastAPI, HTTPException
@@ -30,6 +33,7 @@ _model_lock = threading.Lock()
 _executor = ThreadPoolExecutor(max_workers=2)
 
 def _shutdown_executor():
+    """Gracefully shutdown the thread pool executor."""
     _executor.shutdown(wait=True)
 
 atexit.register(_shutdown_executor)
@@ -178,7 +182,7 @@ def text_to_speech(req: TTSRequest):
         # Validation errors — safe to expose
         logger.warning(f"TTS validation failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    except TimeoutError:
+    except FutureTimeoutError:
         logger.error("TTS generation timed out after 600 seconds")
         raise HTTPException(status_code=504, detail="TTS generation timed out. Please try again.")
     except Exception as e:
@@ -203,7 +207,7 @@ def text_to_speech_stream(req: TTSRequest):
     except ValueError as e:
         logger.warning(f"TTS stream validation failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    except TimeoutError:
+    except FutureTimeoutError:
         logger.error("TTS stream generation timed out after 600 seconds")
         raise HTTPException(status_code=504, detail="TTS generation timed out. Please try again.")
     except Exception as e:
