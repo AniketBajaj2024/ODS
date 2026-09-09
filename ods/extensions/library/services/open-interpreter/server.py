@@ -8,7 +8,6 @@ import os
 import re
 import subprocess
 import tempfile
-from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse

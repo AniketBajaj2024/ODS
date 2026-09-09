@@ -1,6 +1,5 @@
 """Test that open-interpreter server can be imported outside the container."""
 
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
