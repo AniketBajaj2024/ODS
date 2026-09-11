@@ -46,7 +46,18 @@ pub fn run_install(
 
     // Phase 2: Build installer arguments
     let ods_dir = install_dir.join("ods");
-    let mut args = vec!["--tier".to_string(), tier.to_string()];
+    // The GUI owns the wizard, so the script must never prompt. Without this,
+    // install-core.sh keeps INTERACTIVE=true and blocks on `read ... < /dev/tty`
+    // at the feature menu — but the Tauri child has no tty, so the read fails
+    // instantly under `set -e` and the install dies with no phase past
+    // detection. The Windows branch below already passes -NonInteractive; only
+    // the Unix path was missing its half. It also skips the 5s splash sleep and
+    // the reboot / "continue anyway?" prompts, none of which a GUI can answer.
+    let mut args = vec![
+        "--non-interactive".to_string(),
+        "--tier".to_string(),
+        tier.to_string(),
+    ];
 
     if features.contains(&"voice".to_string()) {
         args.push("--voice".into());
