@@ -13,6 +13,16 @@ const TRANSFERRED_REPO_URL_BYTES: &[u8] = &[
     105, 103, 104, 116, 45, 72, 101, 97, 114, 116, 45, 76, 97, 98, 115, 47, 79, 68, 83, 46, 103,
     105, 116,
 ];
+const DOWNLOADING_ODS_MSG: &str = "Downloading ODS";
+const CONFIGURING_INSTALLATION_MSG: &str = "Configuring installation";
+const TIER_ARG: &str = "--tier";
+const VOICE_ARG: &str = "--voice";
+const WORKFLOWS_ARG: &str = "--workflows";
+const RAG_ARG: &str = "--rag";
+const IMAGE_GEN_ARG: &str = "--image-gen";
+const ALL_ARG: &str = "--all";
+const RUNNING_INSTALLER_MSG: &str = "Running installer";
+const INSTALL_SCRIPT_NAME: &str = "install.sh";
 
 fn repo_url() -> &'static str {
     option_env!("ODS_REPO_URL").unwrap_or(DEFAULT_REPO_URL)
@@ -38,36 +48,36 @@ pub fn run_install(
     features: Vec<String>,
 ) -> Result<(), String> {
     // Phase 1: Clone the repo
-    update_progress(&state, "Downloading ODS", 5);
+    update_progress(&state, DOWNLOADING_ODS_MSG, 5);
 
     ensure_checkout(&install_dir)?;
 
-    update_progress(&state, "Configuring installation", 15);
+    update_progress(&state, CONFIGURING_INSTALLATION_MSG, 15);
 
     // Phase 2: Build installer arguments
     let ods_dir = install_dir.join("ods");
-    let mut args = vec!["--tier".to_string(), tier.to_string()];
+    let mut args = vec![TIER_ARG.to_string(), tier.to_string()];
 
     if features.contains(&"voice".to_string()) {
-        args.push("--voice".into());
+        args.push(VOICE_ARG.into());
     }
     if features.contains(&"workflows".to_string()) {
-        args.push("--workflows".into());
+        args.push(WORKFLOWS_ARG.into());
     }
     if features.contains(&"rag".to_string()) {
-        args.push("--rag".into());
+        args.push(RAG_ARG.into());
     }
     if features.contains(&"image_gen".to_string()) {
-        args.push("--image-gen".into());
+        args.push(IMAGE_GEN_ARG.into());
     }
     if features.contains(&"all".to_string()) {
-        args.push("--all".into());
+        args.push(ALL_ARG.into());
     }
 
     // Phase 3: Run the installer with progress parsing
-    update_progress(&state, "Running installer", 20);
+    update_progress(&state, RUNNING_INSTALLER_MSG, 20);
 
-    let install_script = ods_dir.join("install.sh");
+    let install_script = ods_dir.join(INSTALL_SCRIPT_NAME);
     let install_ps1 = install_dir.join("install.ps1");
 
     // Make sure the script is executable
