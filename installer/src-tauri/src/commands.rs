@@ -4,6 +4,7 @@ use serde::Serialize;
 use std::sync::Mutex;
 
 const ALLOWED_FEATURES: &[&str] = &["voice", "workflows", "rag", "image_gen", "all"];
+const MAX_INSTALL_TIER: u8 = 4;
 const ODS_SERVER_URL: &str = "http://localhost:3000";
 const BROWSER_OPEN_ERROR: &str = "Failed to open browser";
 
@@ -186,7 +187,7 @@ pub async fn start_install(
 }
 
 fn validate_install_request(tier: u8, features: &[String]) -> Result<(), String> {
-    if tier > 4 {
+    if tier > MAX_INSTALL_TIER {
         return Err(format!("Unsupported install tier: {}", tier));
     }
 
