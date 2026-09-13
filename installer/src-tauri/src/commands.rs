@@ -1,5 +1,5 @@
 use crate::state::{GpuInfo, InstallPhase, InstallState};
-use crate::{docker, gpu, installer, platform};
+use crate::{docker, gpu, installer, network, platform};
 use serde::Serialize;
 use std::sync::Mutex;
 
@@ -25,6 +25,19 @@ pub fn check_system() -> SystemCheckResult {
         requirements,
         docker,
     }
+}
+
+// ---- Network Check ----
+
+#[tauri::command]
+pub async fn check_network() -> network::NetworkStatus {
+    tokio::task::spawn_blocking(network::check)
+        .await
+        .unwrap_or(network::NetworkStatus {
+            github_reachable: false,
+            docker_registry_reachable: false,
+            all_reachable: false,
+        })
 }
 
 // ---- Prerequisites ----
@@ -116,6 +129,31 @@ pub async fn install_prerequisites(component: String) -> InstallPrereqResult {
             message: format!("Unknown component: {}", component),
             reboot_required: false,
         },
+    }
+}
+
+#[tauri::command]
+pub async fn start_docker() -> InstallPrereqResult {
+    if let Err(msg) = docker::start_docker() {
+        return InstallPrereqResult {
+            success: false,
+            message: msg,
+            reboot_required: false,
+        };
+    }
+
+    if docker::wait_for_docker_running(30).await {
+        InstallPrereqResult {
+            success: true,
+            message: "Docker started successfully.".into(),
+            reboot_required: false,
+        }
+    } else {
+        InstallPrereqResult {
+            success: false,
+            message: "Docker is taking longer than expected to start. Wait a moment and try Re-check, or start it manually.".into(),
+            reboot_required: false,
+        }
     }
 }
 
