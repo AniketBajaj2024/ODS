@@ -21,6 +21,12 @@ export interface RequirementCheck {
   help: string | null;
 }
 
+export interface NetworkStatus {
+  github_reachable: boolean;
+  docker_registry_reachable: boolean;
+  all_reachable: boolean;
+}
+
 export interface DockerStatus {
   installed: boolean;
   running: boolean;
@@ -86,11 +92,17 @@ export interface InstallState {
 
 export const checkSystem = () => invoke<SystemCheckResult>("check_system");
 
+export const checkNetwork = () =>
+  invoke<NetworkStatus>("check_network");
+
 export const checkPrerequisites = () =>
   invoke<PrerequisiteStatus>("check_prerequisites");
 
 export const installPrerequisite = (component: string) =>
   invoke<InstallPrereqResult>("install_prerequisites", { component });
+
+export const startDocker = () =>
+  invoke<InstallPrereqResult>("start_docker");
 
 export const detectGpu = () => invoke<GpuResult>("detect_gpu");
 
