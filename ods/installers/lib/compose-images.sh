@@ -67,5 +67,5 @@ for service in (data.get("services") or {}).values():
 
     # Older Compose builds may lack JSON output. This fallback can include
     # generated build tags, so the local-image filter below remains important.
-    $compose_cmd "${compose_flags[@]}" config --images 2>/dev/null | _ods_compose_filter_external_images
+    eval "$compose_cmd" "${compose_flags[@]}" config --images 2>/dev/null | _ods_compose_filter_external_images
 }

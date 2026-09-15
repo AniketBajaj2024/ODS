@@ -25,7 +25,7 @@ bg_task_start() {
     
     # Create registry if it doesn't exist
     if [[ ! -f "$BG_TASK_REGISTRY" ]]; then
-        echo "[]" > "$BG_TASK_REGISTRY"
+        echo "[]" > "$BG_TASK_REGISTRY" || return 1
     fi
     
     # Add task to registry

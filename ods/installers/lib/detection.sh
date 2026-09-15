@@ -35,7 +35,7 @@ load_capability_profile() {
     if env_out="$("$builder" --output "$CAPABILITY_PROFILE_FILE" --env 2>>"$LOG_FILE")"; then
         load_env_from_output <<< "$env_out"
         CAP_PROFILE_LOADED="true"
-        log "Capability profile loaded: ${CAP_PROFILE_FILE:-$CAPABILITY_PROFILE_FILE}"
+        log "Capability profile loaded: $CAPABILITY_PROFILE_FILE"
         log "Capability profile: platform=${CAP_PLATFORM_ID:-unknown}, gpu=${CAP_GPU_VENDOR:-unknown}, tier=${CAP_RECOMMENDED_TIER:-unknown}"
         [[ -n "${CAP_HARDWARE_CLASS_ID:-}" ]] && log "Hardware class: ${CAP_HARDWARE_CLASS_ID} (${CAP_HARDWARE_CLASS_LABEL:-unknown})"
         return 0
