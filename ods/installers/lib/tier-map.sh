@@ -291,7 +291,7 @@ set_gemma4_tier_config() {
             GGUF_FILE="gemma-4-26B-A4B-it-Q4_K_M.gguf"
             GGUF_URL="https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q4_K_M.gguf"
             GGUF_SHA256=""
-            MAX_CONTEXT=16384
+            MAX_CONTEXT=32768
             LLM_MODEL_SIZE_MB=18000
             ;;
         4)
