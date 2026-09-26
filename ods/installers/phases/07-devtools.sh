@@ -142,14 +142,17 @@ else
         OPENCODE_CONFIG_DIR="$HOME/.config/opencode"
         mkdir -p "$OPENCODE_CONFIG_DIR"
         # Read OLLAMA_PORT and ODS_MODE from .env generated in phase 06
+        _read_env_var() {
+            local key="$1"
+            grep -m1 "^${key}=" "$INSTALL_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"'\''\r' | sed -e 's/[[:space:]]*#.*$//'
+        }
+
         if [[ -f "$INSTALL_DIR/.env" ]]; then
-            [[ -z "${OLLAMA_PORT:-}" ]] && OLLAMA_PORT=$(grep -m1 '^OLLAMA_PORT=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-            # Always re-read ODS_MODE from .env — Phase 06 may have changed it
-            # (e.g. "local" → "lemonade" for AMD) but the shell variable is stale.
-            ODS_MODE=$(grep -m1 '^ODS_MODE=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-            [[ -z "${ODS_MODEL_SWITCHBOARD:-}" ]] && ODS_MODEL_SWITCHBOARD=$(grep -m1 '^ODS_MODEL_SWITCHBOARD=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-            [[ -z "${LITELLM_KEY:-}" ]] && LITELLM_KEY=$(grep -m1 '^LITELLM_KEY=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-            [[ -z "${LITELLM_PORT:-}" ]] && LITELLM_PORT=$(grep -m1 '^LITELLM_PORT=' "$INSTALL_DIR/.env" | cut -d= -f2-)
+            [[ -z "${OLLAMA_PORT:-}" ]] && OLLAMA_PORT="$(_read_env_var OLLAMA_PORT)"
+            ODS_MODE="$(_read_env_var ODS_MODE)"
+            [[ -z "${ODS_MODEL_SWITCHBOARD:-}" ]] && ODS_MODEL_SWITCHBOARD="$(_read_env_var ODS_MODEL_SWITCHBOARD)"
+            [[ -z "${LITELLM_KEY:-}" ]] && LITELLM_KEY="$(_read_env_var LITELLM_KEY)"
+            [[ -z "${LITELLM_PORT:-}" ]] && LITELLM_PORT="$(_read_env_var LITELLM_PORT)"
         fi
         # Route through LiteLLM on AMD/Lemonade, direct to llama-server otherwise.
         #
