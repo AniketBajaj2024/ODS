@@ -282,18 +282,12 @@ OPENCODE_EOF
             if [[ -z "$svc_tmp" ]]; then
                 ai_warn "Failed to create secure temp file for opencode-web.service; skipping user-level unit install"
             else
+                chmod 600 "$svc_tmp"
                 cp "$INSTALL_DIR/opencode/opencode-web.service" "$svc_tmp"
-                # Escape sed special chars to prevent injection from path values
-                _home_esc=$(printf '%s\n' "$HOME" | sed 's/[&/\]/\\&/g')
-                _opencode_bin_esc=$(printf '%s\n' "$OPENCODE_BIN" | sed 's/[&/\]/\\&/g')
-                _opencode_bin_dir_esc=$(printf '%s\n' "$(dirname "$OPENCODE_BIN")" | sed 's/[&/\]/\\&/g')
-                _sed_i "s|__HOME__|${_home_esc}|g" "$svc_tmp"
-                _sed_i "s|__OPENCODE_BIN__|${_opencode_bin_esc}|g" "$svc_tmp"
-                _sed_i "s|__OPENCODE_BIN_DIR__|${_opencode_bin_dir_esc}|g" "$svc_tmp"
-                cp "$svc_tmp" "$SYSTEMD_USER_DIR/opencode-web.service"
+                ...
+                install -m 600 "$svc_tmp" "$SYSTEMD_USER_DIR/opencode-web.service"
                 rm -f "$svc_tmp"
             fi
-
             systemctl --user daemon-reload 2>/dev/null || true
             systemctl --user enable --now opencode-web.service >> "$LOG_FILE" 2>&1 && \
                 ai_ok "OpenCode Web UI service installed (user-level, port 3003)" || \
