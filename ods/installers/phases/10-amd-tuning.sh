@@ -88,11 +88,16 @@ elif [[ "$GPU_BACKEND" == "amd" ]] && ! $DRY_RUN; then
     mkdir -p "$INSTALL_DIR/data/memory-archives/ods-agent"/{memory,agents,tools}
 
     # Reload and enable all timers
-    systemctl --user daemon-reload 2>/dev/null || true
-    for timer in openclaw-session-cleanup memory-shepherd-workspace memory-shepherd-memory; do
-        systemctl --user enable --now "${timer}.timer" >> "$LOG_FILE" 2>&1 || true
-    done
-    ai_ok "Maintenance timers enabled (session cleanup, memory shepherd)"
+    # Reload and enable all timers if user systemd bus is available
+    if systemctl --user status >/dev/null 2>&1; then
+        systemctl --user daemon-reload 2>/dev/null || true
+        for timer in openclaw-session-cleanup memory-shepherd-workspace memory-shepherd-memory; do
+            systemctl --user enable --now "${timer}.timer" >> "$LOG_FILE" 2>&1 || true
+        done
+        ai_ok "Maintenance timers enabled (session cleanup, memory shepherd)"
+    else
+        ai_warn "User systemd bus unavailable; skipping automated timer activation."
+    fi
 
     # Enable lingering so user timers survive logout
     loginctl enable-linger "$(whoami)" 2>/dev/null || \
