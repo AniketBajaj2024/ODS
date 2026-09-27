@@ -80,7 +80,8 @@ elif [[ "$GPU_BACKEND" == "amd" ]] && ! $DRY_RUN; then
             case "$(basename "$_unit")" in
                 ods-host-agent.service|ods-ap-mode.service) continue ;;
             esac
-            cp "$_unit" "$SYSTEMD_USER_DIR/" 2>/dev/null || true
+            _target="$SYSTEMD_USER_DIR/$(basename "$_unit")"
+            sed "s|__INSTALL_DIR__|${INSTALL_DIR}|g" "$_unit" > "$_target" 2>/dev/null || cp "$_unit" "$SYSTEMD_USER_DIR/" 2>/dev/null || true
         done
     fi
 
