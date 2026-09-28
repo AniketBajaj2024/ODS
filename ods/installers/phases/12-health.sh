@@ -69,8 +69,10 @@ _check_container_health() {
     local max_attempts=${3:-60}
     local docker_cmd="${DOCKER_CMD:-docker}"
     local -a docker_cmd_arr=()
-    read -r -a docker_cmd_arr <<< "$docker_cmd"
-    [[ ${#docker_cmd_arr[@]} -gt 0 ]] || docker_cmd_arr=(docker)
+    read -r -a docker_cmd_arr <<< "${docker_cmd:-docker}"
+    if [[ ${#docker_cmd_arr[@]} -eq 0 ]]; then
+        docker_cmd_arr=(docker)
+    fi
 
     printf "  ${GRN}...${NC} Waiting for %-20s " "$name"
     for attempt in $(seq 1 "$max_attempts"); do
