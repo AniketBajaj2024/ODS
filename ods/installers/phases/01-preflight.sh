@@ -160,8 +160,8 @@ _ods_related_compose_containers() {
 }
 
 if [[ ! -d "$INSTALL_DIR" ]] && ! _ods_truthy "${ODS_ALLOW_LEGACY_PARALLEL:-}"; then
-    _pre_ods_install_dir="${ODS_LEGACY_INSTALL_DIR:-}"
-    _pre_ods_findings=()
+    local _pre_ods_install_dir="${ODS_LEGACY_INSTALL_DIR:-}"
+    local -a _pre_ods_findings=()
     if [[ -n "$_pre_ods_install_dir" && -d "$_pre_ods_install_dir" ]] && {
         [[ -f "$_pre_ods_install_dir/.env" ]] ||
         [[ -f "$_pre_ods_install_dir/docker-compose.yml" ]] ||
