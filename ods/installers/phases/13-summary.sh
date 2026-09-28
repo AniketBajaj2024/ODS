@@ -306,7 +306,7 @@ fi
 #=============================================================================
 if ! $DRY_RUN; then
     # Check Perplexica config was seeded (phase 12 may have failed silently)
-    if $DOCKER_CMD inspect ods-perplexica &>/dev/null; then
+    if ${DOCKER_CMD:-docker} inspect ods-perplexica >/dev/null 2>&1; then
         _perplexica_model="${LLM_MODEL:-qwen3-30b-a3b}"
         if [[ -n "${GGUF_FILE:-}" ]]; then
             _perplexica_model="$GGUF_FILE"
