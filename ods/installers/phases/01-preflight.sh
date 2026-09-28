@@ -49,7 +49,7 @@ if ! command -v jq &> /dev/null; then
     if ! ods_sudo_available; then
         error "jq is required but not installed and privileged package installation is unavailable. Install jq first, then re-run ODS."
     fi
-    case "$PKG_MANAGER" in
+    case "${PKG_MANAGER:-}" in
         dnf)    ods_sudo dnf install -y jq ;;
         pacman) ods_sudo pacman -S --noconfirm jq ;;
         zypper) ods_sudo zypper install -y jq ;;
