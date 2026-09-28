@@ -242,7 +242,7 @@ with urllib.request.urlopen(request, timeout=90) as result:
 content = body.get("choices", [{}])[0].get("message", {}).get("content")
 if content is None:
     raise SystemExit("completion response did not contain assistant content")
-' "$container_url" "$model" 2>&1
+' "${container_url:-}" "${model:-}" 2>&1
     )" || {
         ai_bad "ODS containers cannot use external ${provider} at ${container_url}."
         ai "On Linux, bind the provider to a container-reachable interface (for example 0.0.0.0 on a trusted host) and allow the ODS Docker subnet through the firewall."
