@@ -218,8 +218,9 @@ if [[ $GPU_COUNT -gt 0 && "$GPU_BACKEND" == "nvidia" ]]; then
     fi
     if [[ -n "$DRIVER_VERSION" && "$DRIVER_VERSION" =~ ^[0-9]+$ ]]; then
         log "NVIDIA driver: $DRIVER_VERSION"
-        if [[ "$DRIVER_VERSION" -lt "$MIN_DRIVER_VERSION" ]]; then
-            ai_bad "NVIDIA driver $DRIVER_VERSION is too old. llama-server (CUDA) requires driver >= $MIN_DRIVER_VERSION."
+        local min_drv="${MIN_DRIVER_VERSION:-570}"
+        if [[ "$DRIVER_VERSION" -lt "$min_drv" ]]; then
+            ai_bad "NVIDIA driver $DRIVER_VERSION is too old. llama-server (CUDA) requires driver >= $min_drv."
             if nvidia_blackwell_hardware_detected; then
                 ai_bad "This is a Blackwell GPU, so install an NVIDIA open kernel module driver."
                 ai "  sudo apt install nvidia-open"
