@@ -34,6 +34,7 @@ if [[ -z "$_external_url" && "${ODS_MODE:-local}" == "local" && "${LEMONADE_EXTE
     _detected_provider=""
     _detected_url=""
     _detected_model=""
+    local _candidate _candidate_provider _candidate_url _candidate_model
     for _candidate in "ollama|http://127.0.0.1:11434" "lmstudio|http://127.0.0.1:1234"; do
         _candidate_provider="${_candidate%%|*}"
         _candidate_url="${_candidate#*|}"
