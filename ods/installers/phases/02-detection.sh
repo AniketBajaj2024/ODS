@@ -51,9 +51,9 @@ if [[ "${ODS_MODE:-local}" == "cloud" ]]; then
         _wsl_ram_bytes=""
         if command -v powershell.exe &>/dev/null; then
             _wsl_ram_bytes=$(powershell.exe -NoProfile -Command \
-                "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory" 2>/dev/null | tr -d '\r')
+                "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory" 2>/dev/null | tr -d '\r\n ' || true)
         fi
-        if [[ -n "$_wsl_ram_bytes" && "$_wsl_ram_bytes" =~ ^[0-9]+$ ]]; then
+        if [[ -n "${_wsl_ram_bytes:-}" && "$_wsl_ram_bytes" =~ ^[0-9]+$ ]]; then
             RAM_KB=$((_wsl_ram_bytes / 1024))
         else
             RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
