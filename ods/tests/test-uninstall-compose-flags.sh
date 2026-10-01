@@ -44,7 +44,7 @@ emit_filtered() {
 }
 
 if [[ "${1:-}" == "ps" ]]; then
-    NAMES="ods-litellm ods-llama-server kube-pods-proxy methods-runner"
+    NAMES="ods-litellm ods-llama-server kube-pods-proxy methods-runner ods-pixel-retired-0123456789abcdef"
     emit_filtered "$@"
     exit 0
 fi
@@ -69,6 +69,9 @@ EOF
     cat > "$stub_dir/sudo" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${SUDO_LOG:?}"
+if [[ "$*" == "-n true" ]]; then
+    exit "${SUDO_VALIDATE_EXIT_CODE:-0}"
+fi
 exit 0
 EOF
     chmod +x "$stub_dir/sudo"
@@ -77,6 +80,7 @@ EOF
 #!/usr/bin/env bash
 case "${1:-}" in
     -u|-g) printf '1000\n' ;;
+    -un) printf 'fixture-owner\n' ;;
     *) exit 1 ;;
 esac
 EOF
@@ -87,14 +91,32 @@ EOF
 exit 1
 EOF
     chmod +x "$stub_dir/pgrep"
+
+    # This fixture models native Docker cleanup, not WSL task retirement.
+    # Keep it isolated from the machine on which the test happens to run.
+    cat > "$stub_dir/uname" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-r" ]]; then
+    printf 'fixture-native-kernel\n'
+else
+    /usr/bin/uname "$@"
+fi
+EOF
+    chmod +x "$stub_dir/uname"
 }
 
 make_install() {
     local install_dir="$1"
 
-    mkdir -p "$install_dir/data" "$install_dir/lib"
+    mkdir -p "$install_dir/data" "$install_dir/lib" "$install_dir/systemd"
     cp "$TARGET" "$install_dir/ods-uninstall.sh"
     cp "$ROOT_DIR/lib/safe-env.sh" "$install_dir/lib/safe-env.sh"
+    cp "$ROOT_DIR/lib/system-uninstall.sh" "$install_dir/lib/system-uninstall.sh"
+    mkdir -p "$install_dir/scripts"
+    cp "$ROOT_DIR/scripts/compose-cache-policy.py" "$install_dir/scripts/"
+    cp "$ROOT_DIR/scripts/resolve-compose-stack.sh" "$install_dir/scripts/"
+    mkdir -p "$install_dir/installers/macos/lib"
+    cp "$ROOT_DIR/installers/macos/lib/pixel-native-uninstall.py" "$install_dir/installers/macos/lib/"
     touch "$install_dir/ods-cli"
     touch "$install_dir/docker-compose.base.yml"
     touch "$install_dir/docker-compose.cpu.yml"
@@ -113,6 +135,8 @@ run_uninstall() {
     PATH="$stub_dir:$PATH" \
     DOCKER_LOG="${DOCKER_LOG:?}" \
     SUDO_LOG="${SUDO_LOG:?}" \
+    SUDO_VALIDATE_EXIT_CODE="${SUDO_VALIDATE_EXIT_CODE:-0}" \
+    ODS_UNINSTALL_SYSTEMD_DIR="$install_dir/systemd" \
         bash "$install_dir/ods-uninstall.sh" --force "$@" >/dev/null
 }
 
@@ -128,6 +152,66 @@ main() {
     local stub_dir="$TMP_DIR/bin"
     mkdir -p "$stub_dir"
     make_stub_bin "$stub_dir"
+
+    # Refusal must precede every privileged/service cleanup and preserve data.
+    local unsafe_install="$TMP_DIR/unsafe-install" unsafe_home="$TMP_DIR/unsafe-home"
+    local unsafe_docker="$TMP_DIR/unsafe-docker.log" unsafe_sudo="$TMP_DIR/unsafe-sudo.log"
+    make_install "$unsafe_install"
+    mkdir -p "$unsafe_home" "$unsafe_install/data/user-extensions/example"
+    printf '%s\n' '{"services":{"example":{"image":"example/app:1","privileged":true}}}' \
+        > "$unsafe_install/data/user-extensions/example/compose.yaml"
+    printf '%s\n' '-f docker-compose.base.yml -f data/user-extensions/example/compose.yaml' \
+        > "$unsafe_install/.compose-flags"
+    printf 'retain owner data\n' > "$unsafe_install/data/owner.txt"
+    if DOCKER_LOG="$unsafe_docker" SUDO_LOG="$unsafe_sudo" \
+        run_uninstall "$unsafe_install" "$unsafe_home" "$stub_dir" 2>"$TMP_DIR/unsafe-error"; then
+        fail "unsafe cached extension must block uninstall"
+    fi
+    [[ ! -s "$unsafe_docker" && ! -s "$unsafe_sudo" ]] \
+        || fail "unsafe recipe rejection must precede Docker and sudo"
+    [[ -f "$unsafe_install/ods-uninstall.sh" && -f "$unsafe_install/data/owner.txt" ]] \
+        || fail "unsafe recipe rejection must preserve installation and owner data"
+    grep -qF 'requires review' "$TMP_DIR/unsafe-error" \
+        || fail "unsafe recipe rejection must identify the recipe policy failure"
+    pass "unsafe cached recipes are refused before any uninstall mutation"
+
+    rm "$unsafe_install/scripts/compose-cache-policy.py"
+    if DOCKER_LOG="$unsafe_docker" SUDO_LOG="$unsafe_sudo" \
+        run_uninstall "$unsafe_install" "$unsafe_home" "$stub_dir" 2>"$TMP_DIR/missing-policy-error"; then
+        fail "missing security policy must not bypass uninstall validation"
+    fi
+    [[ ! -s "$unsafe_docker" && ! -s "$unsafe_sudo" && -f "$unsafe_install/data/owner.txt" ]] \
+        || fail "missing security policy must retain the installation"
+    grep -qF 'complete current ODS checkout' "$TMP_DIR/missing-policy-error" \
+        || fail "missing policy failure must explain recovery"
+    pass "missing policy fails closed with a recovery instruction"
+
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        local changed_install="$TMP_DIR/changed-install" changed_home="$TMP_DIR/changed-home"
+        local changed_docker="$TMP_DIR/changed-docker.log"
+        make_install "$changed_install"
+        mkdir -p "$changed_home" "$changed_install/data/user-extensions/example"
+        printf '%s\n' '{"services":{"example":{"image":"example/app:1"}}}' \
+            > "$changed_install/data/user-extensions/example/compose.yaml"
+        printf '%s\n' '-f docker-compose.base.yml -f data/user-extensions/example/compose.yaml' \
+            > "$changed_install/.compose-flags"
+        # Inject recipe drift after the initial preflight, before Compose down.
+        cat > "$changed_install/lib/pixel-uninstall.sh" <<'EOF'
+ods_pixel_uninstall_managed() {
+    printf '%s\n' '{"services":{"example":{"image":"example/app:1","privileged":true}}}' \
+        > "$INSTALL_DIR/data/user-extensions/example/compose.yaml"
+}
+EOF
+        if DOCKER_LOG="$changed_docker" SUDO_LOG="$unsafe_sudo" \
+            run_uninstall "$changed_install" "$changed_home" "$stub_dir" 2>"$TMP_DIR/changed-error"; then
+            fail "recipe drift before Compose down must abort remaining cleanup"
+        fi
+        [[ ! -s "$changed_docker" && -d "$changed_install" ]] \
+            || fail "changed recipes must not reach Compose or data removal"
+        grep -qF 'changed during uninstall' "$TMP_DIR/changed-error" \
+            || fail "mid-uninstall drift must explain the partial retirement state"
+        pass "recipe drift during retirement is rechecked before Compose down"
+    fi
 
     local install_keep="$TMP_DIR/install-keep"
     local home_keep="$TMP_DIR/home-keep"
@@ -184,6 +268,47 @@ main() {
         || fail "privileged uninstall must chown retained data through cached sudo credentials"
     pass "uninstall separates the interactive sudo prompt from privileged commands"
 
+    local install_noninteractive="$TMP_DIR/install-noninteractive"
+    local home_noninteractive="$TMP_DIR/home-noninteractive"
+    local log_noninteractive="$TMP_DIR/docker-noninteractive.log"
+    local sudo_noninteractive="$TMP_DIR/sudo-noninteractive.log"
+    local out_noninteractive="$TMP_DIR/uninstall-noninteractive.out"
+    local noninteractive_rc
+    mkdir -p "$home_noninteractive"
+    make_install "$install_noninteractive"
+    : > "$log_noninteractive"
+    : > "$sudo_noninteractive"
+    set +e
+    HOME="$home_noninteractive" \
+    INSTALL_DIR="$install_noninteractive" \
+    PATH="$stub_dir:$PATH" \
+    DOCKER_LOG="$log_noninteractive" \
+    SUDO_LOG="$sudo_noninteractive" \
+    SUDO_VALIDATE_EXIT_CODE=1 \
+        python3 - "$install_noninteractive/ods-uninstall.sh" >"$out_noninteractive" 2>&1 <<'PY'
+import subprocess
+import sys
+
+try:
+    raise SystemExit(subprocess.run(
+        ["bash", sys.argv[1], "--force", "--non-interactive"], timeout=5).returncode)
+except subprocess.TimeoutExpired:
+    raise SystemExit(124)
+PY
+    noninteractive_rc=$?
+    set -e
+    [[ "$noninteractive_rc" -ne 0 && "$noninteractive_rc" -ne 124 ]] \
+        || fail "non-interactive uninstall must fail promptly when sudo cannot authenticate (rc=$noninteractive_rc)"
+    [[ -d "$install_noninteractive" ]] \
+        || fail "failed non-interactive sudo preflight must not mutate the install tree"
+    [[ ! -s "$log_noninteractive" ]] \
+        || fail "failed non-interactive sudo preflight must happen before Docker cleanup"
+    grep -qx -- '-n true' "$sudo_noninteractive" \
+        || fail "non-interactive uninstall must validate sudo without prompting"
+    grep -qF 'Non-interactive uninstall requires cached or passwordless sudo' "$out_noninteractive" \
+        || fail "non-interactive sudo failure must explain how to retry"
+    pass "non-interactive uninstall fails promptly and before mutation when sudo is unavailable"
+
     local install_safe="$TMP_DIR/install-safe-env"
     local home_safe="$TMP_DIR/home-safe-env"
     local log_safe="$TMP_DIR/docker-safe-env.log"
@@ -211,11 +336,11 @@ EOF
         [[ "$removed_containers" == *"$name"* ]] \
             || fail "uninstall must remove project container $name (got: '$removed_containers')"
     done
-    for name in kube-pods-proxy methods-runner; do
+    for name in kube-pods-proxy methods-runner ods-pixel-retired-0123456789abcdef; do
         [[ "$removed_containers" != *"$name"* ]] \
             || fail "uninstall must not remove unrelated container $name (got: '$removed_containers')"
     done
-    pass "container discovery stays on the ods- prefix"
+    pass "container discovery stays on the ods- prefix and preserves native sandbox archives"
 
     for name in ods_perplexica-data ods-legacy-cache; do
         [[ "$removed_volumes" == *"$name"* ]] \
