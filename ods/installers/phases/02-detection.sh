@@ -427,9 +427,9 @@ if [[ -z "$TIER" ]]; then
     elif [[ "$GPU_BACKEND" == "intel" ]]; then
         # Intel Arc discrete GPU — SYCL backend via llama.cpp
         # A770 = 16 GB  → ARC  (≥12 GB)
+        # A750 =  8 GB  → ARC_LITE
         # A380 =  6 GB  → ARC_LITE
-        local arc_vram_gb=$((GPU_VRAM / 1024))
-        if [[ $arc_vram_gb -ge 12 ]]; then
+        if (( GPU_VRAM / 1024 >= 12 )); then
             TIER="ARC"
         else
             TIER="ARC_LITE"
