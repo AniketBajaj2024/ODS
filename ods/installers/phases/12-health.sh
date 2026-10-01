@@ -507,9 +507,7 @@ ods_progress 94 "health" "Checking extension services"
 # Docker network, not bound to the host. Wait on the container healthcheck
 # instead of curling localhost:9119, which would fail on a correct install.
 if [[ "$ENABLE_HERMES" == "true" ]]; then
-    local hermes_container
-    hermes_container="$(sr_container hermes 2>/dev/null || echo "ods-hermes")"
-    if ! _check_container_health "Hermes Agent" "$hermes_container" 60; then
+    if ! _check_container_health "Hermes Agent" "$(sr_container hermes 2>/dev/null || printf '%s\n' ods-hermes)" 60; then
         HEALTH_FAILURES=$((HEALTH_FAILURES + 1))
     fi
 fi
