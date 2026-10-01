@@ -40,8 +40,8 @@ if [[ -x "$SCRIPT_DIR/scripts/preflight-engine.sh" ]]; then
         --script-dir "$SCRIPT_DIR" \
         --env 2>>"$LOG_FILE")"
     if [[ -n "$PREFLIGHT_ENV" ]]; then
-        printf '%s\n' "$PREFLIGHT_ENV" | load_env_from_output
-    fig
+        load_env_from_output <<< "$PREFLIGHT_ENV"
+    fi
 
     log "Preflight report: $PREFLIGHT_REPORT_FILE"
     if [[ "${PREFLIGHT_BLOCKERS:-0}" -gt 0 ]]; then
