@@ -109,3 +109,56 @@ pub async fn install_docker() -> Result<String, String> {
         ))
     }
 }
+
+/// Launch the already-installed Docker daemon/app. Does NOT install Docker.
+pub fn start_docker() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(["-a", "Docker"])
+            .spawn()
+            .map_err(|e| format!("Failed to launch Docker Desktop: {}", e))?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let docker_paths = [
+            "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+            "C:\\Program Files (x86)\\Docker\\Docker\\Docker Desktop.exe",
+        ];
+
+        for path in docker_paths {
+            if std::path::Path::new(path).exists() {
+                Command::new(path)
+                    .spawn()
+                    .map_err(|e| format!("Failed to launch Docker Desktop: {}", e))?;
+                return Ok(());
+            }
+        }
+        Err("Docker Desktop.exe not found at standard locations. Start it manually from Programs.".into())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("systemctl")
+            .args(["start", "docker"])
+            .output()
+            .map_err(|e| format!("Failed to start Docker: {}", e))?;
+        Ok(())
+    }
+}
+
+/// Poll is_docker_running() until true or timeout elapses.
+pub async fn wait_for_docker_running(timeout_secs: u64) -> bool {
+    let start = std::time::Instant::now();
+    loop {
+        if is_docker_running() {
+            return true;
+        }
+        if start.elapsed().as_secs() >= timeout_secs {
+            return false;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+}
