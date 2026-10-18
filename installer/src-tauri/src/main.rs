@@ -5,6 +5,7 @@ mod commands;
 mod docker;
 mod gpu;
 mod installer;
+mod network;
 mod platform;
 mod state;
 
@@ -12,8 +13,10 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             commands::check_system,
+            commands::check_network,
             commands::check_prerequisites,
             commands::install_prerequisites,
+            commands::start_docker,
             commands::detect_gpu,
             commands::start_install,
             commands::get_install_progress,

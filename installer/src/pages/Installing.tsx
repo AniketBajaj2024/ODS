@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { startInstall, getInstallProgress, type ProgressInfo } from "../hooks/useTauri";
+import { startInstall, getInstallProgress, checkNetwork, type ProgressInfo } from "../hooks/useTauri";
 
 interface Props {
   tier: number;
@@ -10,6 +10,7 @@ interface Props {
 }
 
 const PHASE_LABELS: Record<string, string> = {
+  network: "Checking network connectivity",
   preflight: "Running preflight checks",
   detection: "Detecting hardware",
   docker: "Setting up Docker",
@@ -38,12 +39,36 @@ export default function Installing({
     if (started.current) return;
     started.current = true;
 
-    // Start the install
-    startInstall(tier, features, installDir).then(() => {
-      onComplete();
-    }).catch((e) => {
-      onError(String(e));
-    });
+    const runInstall = async () => {
+      setProgress({
+        phase: "network",
+        percent: 5,
+        message: "Checking network connectivity...",
+        error: null,
+      });
+
+      try {
+        const netStatus = await checkNetwork();
+        if (!netStatus.all_reachable) {
+          const missing = [];
+          if (!netStatus.github_reachable) missing.push("github.com");
+          if (!netStatus.docker_registry_reachable) missing.push("docker registry");
+          onError(`Cannot reach: ${missing.join(", ")}. Check your network and firewall.`);
+          return;
+        }
+      } catch (e) {
+        onError(`Network check failed: ${String(e)}`);
+        return;
+      }
+
+      startInstall(tier, features, installDir).then(() => {
+        onComplete();
+      }).catch((e) => {
+        onError(String(e));
+      });
+    };
+
+    runInstall();
 
     // Poll for progress
     const interval = setInterval(async () => {
