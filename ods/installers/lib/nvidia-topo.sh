@@ -54,7 +54,7 @@ parse_nvidia_topo_matrix() {
     return
   }
   
-  matrix=$(echo "$matrix" | sed 's/\x1b\[[0-9;]*m//g')
+  matrix=$(echo "$matrix" | sed 's/\033\[[0-9;]*m//g')
 
   local header_line headers=()
   header_line=$(echo "$matrix" | grep -E '^\s+GPU[0-9]' | head -1)
