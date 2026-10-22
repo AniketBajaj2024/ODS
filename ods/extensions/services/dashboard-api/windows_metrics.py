@@ -39,46 +39,50 @@ def ram_usage(total_bytes: int, available_bytes: int) -> dict:
     }
 
 
-def _read_system_times() -> SystemTimes:
-    assert sys.platform == "win32"  # kernel32 exists only on Windows
+# kernel32 exists only on Windows. A module-level platform branch is what
+# type checkers running on Linux understand; the other branch raises.
+if sys.platform == "win32":
     import ctypes
     from ctypes import wintypes
 
-    idle, kernel, user = wintypes.FILETIME(), wintypes.FILETIME(), wintypes.FILETIME()
-    if not ctypes.windll.kernel32.GetSystemTimes(
-        ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)
-    ):
-        raise ctypes.WinError()
+    def _read_system_times() -> SystemTimes:
+        idle, kernel, user = wintypes.FILETIME(), wintypes.FILETIME(), wintypes.FILETIME()
+        if not ctypes.windll.kernel32.GetSystemTimes(
+            ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)
+        ):
+            raise ctypes.WinError()
 
-    def ticks(value: wintypes.FILETIME) -> int:
-        return (value.dwHighDateTime << 32) | value.dwLowDateTime
+        def ticks(value: wintypes.FILETIME) -> int:
+            return (value.dwHighDateTime << 32) | value.dwLowDateTime
 
-    return ticks(idle), ticks(kernel), ticks(user)
+        return ticks(idle), ticks(kernel), ticks(user)
 
+    def _read_memory_status() -> tuple[int, int]:
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", wintypes.DWORD),
+                ("dwMemoryLoad", wintypes.DWORD),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
 
-def _read_memory_status() -> tuple[int, int]:
-    assert sys.platform == "win32"  # kernel32 exists only on Windows
-    import ctypes
-    from ctypes import wintypes
+        status = MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            raise ctypes.WinError()
+        return status.ullTotalPhys, status.ullAvailPhys
 
-    class MEMORYSTATUSEX(ctypes.Structure):
-        _fields_ = [
-            ("dwLength", wintypes.DWORD),
-            ("dwMemoryLoad", wintypes.DWORD),
-            ("ullTotalPhys", ctypes.c_ulonglong),
-            ("ullAvailPhys", ctypes.c_ulonglong),
-            ("ullTotalPageFile", ctypes.c_ulonglong),
-            ("ullAvailPageFile", ctypes.c_ulonglong),
-            ("ullTotalVirtual", ctypes.c_ulonglong),
-            ("ullAvailVirtual", ctypes.c_ulonglong),
-            ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
-        ]
+else:
+    def _read_system_times() -> SystemTimes:
+        raise OSError("Windows CPU times are only available on Windows")
 
-    status = MEMORYSTATUSEX()
-    status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
-        raise ctypes.WinError()
-    return status.ullTotalPhys, status.ullAvailPhys
+    def _read_memory_status() -> tuple[int, int]:
+        raise OSError("Windows memory status is only available on Windows")
 
 
 def get_cpu_metrics() -> dict:
