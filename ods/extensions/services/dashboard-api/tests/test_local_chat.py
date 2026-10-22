@@ -119,6 +119,19 @@ def test_a_long_conversation_on_a_small_context_still_answers(setup):
     assert fake.sent_messages[0]["role"] == "user" and fake.sent_messages[-1] == history[-1]
 
 
+def test_the_reported_context_start_keeps_the_next_prompt_prefix(setup):
+    install, _ = setup
+    client, fake = install(FakeLlama(n_ctx=4096))
+    history = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"turn {i} " * 40} for i in range(199)]
+    first = client.post("/api/local-chat/stream", headers=AUTH, json={"messages": history})
+    start = json.loads(events(first.text)[0].split("data: ", 1)[1])["contextStart"]
+    first_prefix = fake.sent_messages[:-1]
+    history += [{"role": "assistant", "content": "ok"}, {"role": "user", "content": "next"}]
+    second = client.post("/api/local-chat/stream", headers=AUTH, json={"messages": history, "contextStart": start})
+    assert json.loads(events(second.text)[0].split("data: ", 1)[1])["contextStart"] == start
+    assert fake.sent_messages[: len(first_prefix)] == first_prefix
+
+
 def test_a_message_too_long_is_refused_before_inference(setup):
     install, _ = setup
     client, fake = install(FakeLlama(n_ctx=4096))

@@ -50,6 +50,9 @@ class ChatMessage(BaseModel):
 class LocalChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=400)
     system: Optional[str] = Field(default=None, max_length=16 * 1024)
+    # The contextStart the previous answer reported. Sending it back keeps the
+    # model's prompt prefix unchanged, so its cache answers in about a second.
+    contextStart: Optional[int] = Field(default=None, ge=0)
 
 
 class LocalChatError(Exception):
@@ -147,7 +150,8 @@ async def local_chat_stream(body: LocalChatRequest, request: Request):
         answer_tokens = min(ANSWER_TOKENS, n_ctx // 4)  # A small context still leaves room to ask.
         try:
             fitted = await fit(body.system, turns[:-1], turns[-1]["content"],
-                               n_ctx=n_ctx, reserve=answer_tokens, measure=_measurer(client, llm))
+                               n_ctx=n_ctx, reserve=answer_tokens, measure=_measurer(client, llm),
+                               start_hint=body.contextStart)
         except MessageTooLong as exc:
             raise LocalChatError("message_too_long", 413, promptTokens=exc.prompt_tokens,
                                  budgetTokens=exc.budget) from exc
@@ -173,6 +177,7 @@ async def local_chat_stream(body: LocalChatRequest, request: Request):
         # First event: what was sent, so the owner can see when old turns
         # were left out of the model's view (they stay in the saved chat).
         yield ("event: ods\ndata: " + json.dumps({"droppedMessages": fitted.dropped_messages,
+                                                 "contextStart": fitted.dropped_messages,
                                                  "promptTokens": fitted.prompt_tokens}) + "\n\n").encode()
         done_seen = False
         buffered = bytearray()
