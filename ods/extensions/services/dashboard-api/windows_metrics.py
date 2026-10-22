@@ -6,6 +6,7 @@ readers touch ctypes, and they exist only on Windows.
 
 from __future__ import annotations
 
+import sys
 from typing import Optional
 
 # (idle, kernel, user) in 100 ns units from GetSystemTimes. Kernel time
@@ -39,6 +40,7 @@ def ram_usage(total_bytes: int, available_bytes: int) -> dict:
 
 
 def _read_system_times() -> SystemTimes:
+    assert sys.platform == "win32"  # kernel32 exists only on Windows
     import ctypes
     from ctypes import wintypes
 
@@ -55,6 +57,7 @@ def _read_system_times() -> SystemTimes:
 
 
 def _read_memory_status() -> tuple[int, int]:
+    assert sys.platform == "win32"  # kernel32 exists only on Windows
     import ctypes
     from ctypes import wintypes
 
