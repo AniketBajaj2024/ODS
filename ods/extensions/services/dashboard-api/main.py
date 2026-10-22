@@ -1268,6 +1268,15 @@ app.include_router(pixel_sharing.router)
 app.include_router(pixel_model_failure.router)
 app.include_router(opencode_app.router)
 
+if RUNTIME_PROFILE.is_desktop:
+    # Validated now so a launcher without its llama-server settings fails at
+    # startup with the variable named, not on the owner's first message.
+    import native_llm
+    from routers import local_chat
+
+    native_llm.configured()
+    app.include_router(local_chat.router)
+
 
 # ================================================================
 # Core Endpoints (health, status, preflight, services)

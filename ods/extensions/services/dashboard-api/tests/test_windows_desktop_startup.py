@@ -73,6 +73,8 @@ def _run_desktop_probe(tmp_path, seconds="6"):
         # The real bundled manifests: every Compose service is declared here.
         "ODS_EXTENSIONS_DIR": str(API_DIR.parent),
         "DASHBOARD_API_KEY": "desktop-probe-key",
+        "ODS_NATIVE_LLM_URL": "http://127.0.0.1:18080",
+        "ODS_NATIVE_LLM_RUNTIME_DIR": str(tmp_path / "portal-runtime"),
         # A reachable-looking agent address must still never be dialed.
         "ODS_AGENT_HOST": "127.0.0.1",
     }
