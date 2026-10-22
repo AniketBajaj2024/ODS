@@ -138,6 +138,15 @@ try {
     $null = Get-ODSDesktopModel -Pin $pin -ModelsDir $models -Download $fake.Block
     Check ($fake.State.calls -eq 1 -and (Get-ODSDesktopFileSha256 $target) -eq $sha) 'the next run continues from the kept partial'
 
+    # --- A download step that prints before its exit code still succeeds ---
+    Remove-Item -LiteralPath $target, $stamp
+    $talkative = { param([string]$Url, [string]$Partial)
+        Write-Output '  % Total    % Received % Xferd  Average Speed'
+        [IO.File]::WriteAllBytes($Partial, $content)
+        return 0 }
+    $result = Get-ODSDesktopModel -Pin $pin -ModelsDir $models -Download $talkative
+    Check ($result.Downloaded -and (Get-ODSDesktopFileSha256 $target) -eq $sha) 'output printed by a download step is never read as its exit code'
+
     # --- Every path call in the library is literal ---
     $tokens = $null; $errors = $null
     $ast = [Management.Automation.Language.Parser]::ParseFile($library, [ref]$tokens, [ref]$errors)

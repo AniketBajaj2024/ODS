@@ -87,8 +87,17 @@ function Invoke-ODSDesktopModelCurl([string]$Url, [string]$Partial) {
     # resumes whatever the partial already holds. A transfer under 1 KiB/s for
     # 120 s is a stall; there is deliberately no total --max-time.
     & curl.exe --fail --location --proto '=https' --proto-redir '=https' --continue-at - `
-        --speed-limit 1024 --speed-time 120 --connect-timeout 30 --output $Partial $Url
+        --speed-limit 1024 --speed-time 120 --connect-timeout 30 --output $Partial $Url | Out-Host
     return $LASTEXITCODE
+}
+
+function Invoke-ODSDesktopModelStep([scriptblock]$Step, [object[]]$Arguments) {
+    # A step returns its exit code last. Anything a native tool printed before
+    # it is shown to the owner, never mistaken for part of the exit code.
+    $results = @(& $Step @Arguments)
+    if ($results.Count -eq 0) { throw 'The model download step finished without an exit code.' }
+    if ($results.Count -gt 1) { $results[0..($results.Count - 2)] | Out-Host }
+    return [int]$results[-1]
 }
 
 function Get-ODSDesktopModel {
@@ -124,7 +133,7 @@ function Get-ODSDesktopModel {
             Remove-Item -LiteralPath $partial -Force  # Larger than the pin: it can never verify.
             $before = 0
         }
-        $code = & $Download ([string]$Pin.Url) $partial
+        $code = Invoke-ODSDesktopModelStep $Download @([string]$Pin.Url, $partial)
         if ($code -eq 0) { break }
         $after = if (Test-Path -LiteralPath $partial) { (Get-Item -LiteralPath $partial).Length } else { 0 }
         if ($attempt -eq $Attempts) {
