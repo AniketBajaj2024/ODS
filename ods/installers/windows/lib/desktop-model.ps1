@@ -35,11 +35,12 @@ function Assert-ODSDesktopModelPin($Pin) {
 }
 
 function Get-ODSDesktopFileSha256([string]$Path) {
-    # CNG on Windows: never slower than the managed SHA256 Get-FileHash uses in
+    # CNG: never slower than the managed SHA256 that Get-FileHash uses in
     # Windows PowerShell 5.1, and several times faster on CPUs with SHA
-    # extensions. The stamp below is what keeps launches from hashing at all.
-    $onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
-    $algorithm = if ($onWindows) { [Security.Cryptography.SHA256Cng]::new() } else { [Security.Cryptography.SHA256]::Create() }
+    # extensions. .NET Framework needs SHA256Cng asked for by name; modern .NET
+    # (PowerShell 7) has no such type, and its SHA256.Create() is already CNG
+    # on Windows. The stamp below is what keeps launches from hashing at all.
+    $algorithm = if ($PSVersionTable.PSEdition -eq 'Desktop') { [Security.Cryptography.SHA256Cng]::new() } else { [Security.Cryptography.SHA256]::Create() }
     $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     try {
         return ([BitConverter]::ToString($algorithm.ComputeHash($stream)) -replace '-', '').ToLowerInvariant()
