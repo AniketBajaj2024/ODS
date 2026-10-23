@@ -2012,6 +2012,20 @@ async def _poll_service_health():
         await asyncio.sleep(_SERVICE_POLL_INTERVAL)
 
 
+if RUNTIME_PROFILE.is_desktop:
+    # Windows Desktop has no nginx: when the launcher hands over the built
+    # dashboard, dashboard-api serves it behind the same loopback trust
+    # boundary nginx applies. Starlette matches routes in registration
+    # order, so this "/" mount must stay below every @app route above.
+    import native_front
+    from security import DASHBOARD_API_KEY
+
+    _dashboard_dist = native_front.dist_dir()
+    if _dashboard_dist is not None:
+        app.add_middleware(native_front.DashboardGate, api_key=DASHBOARD_API_KEY)
+        app.mount("/", native_front.DashboardFiles(directory=_dashboard_dist, html=True), name="dashboard")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DASHBOARD_API_PORT", "3002")))
