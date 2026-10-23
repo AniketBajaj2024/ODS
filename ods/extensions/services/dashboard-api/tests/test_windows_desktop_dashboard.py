@@ -55,6 +55,9 @@ def test_desktop_profile_serves_the_dashboard_behind_its_gate(tmp_path):
         "ODS_INSTALL_DIR": str(tmp_path / "install"),
         "ODS_EXTENSIONS_DIR": str(API_DIR.parent),
         "DASHBOARD_API_KEY": "desktop-probe-key",
+        # #7975 checks the local model settings at startup.
+        "ODS_NATIVE_LLM_URL": "http://127.0.0.1:18080",
+        "ODS_NATIVE_LLM_RUNTIME_DIR": str(tmp_path / "portal-runtime"),
         "ODS_DASHBOARD_DIST": str(dist),
     }
     env.pop("GPU_BACKEND", None)
