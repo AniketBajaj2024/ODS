@@ -25,13 +25,15 @@ $SourceRoot = Split-Path -Parent $PSScriptRoot
 $Lib = Join-Path $PSScriptRoot 'windows\lib'
 . (Join-Path $Lib 'wsl-portal-amd.ps1')
 . (Join-Path $Lib 'app-shortcut.ps1')
-foreach ($name in @('desktop-model.ps1', 'desktop-settings.ps1', 'desktop-python.ps1', 'desktop-runtime.ps1', 'desktop-api-launcher.ps1')) {
+foreach ($name in @('desktop-model.ps1', 'desktop-settings.ps1', 'desktop-python.ps1', 'desktop-runtime.ps1', 'desktop-api-launcher.ps1',
+    'desktop-uninstall.ps1')) {
     . (Join-Path $Lib $name)
 }
 
-# Files the sign-in task runs, copied beside launch-api.ps1.
+# Files the sign-in task and uninstall.ps1 run, copied beside launch-api.ps1
+# so both keep working after the ODS checkout is moved or deleted.
 $script:ODSDesktopLauncherLibraries = @('private-file.ps1', 'native-llama-runtime.ps1', 'desktop-python.ps1',
-    'desktop-runtime.ps1', 'desktop-api-launcher.ps1')
+    'desktop-runtime.ps1', 'desktop-api-launcher.ps1', 'app-shortcut.ps1', 'desktop-uninstall.ps1')
 $script:ODSDesktopApiReadySeconds = 150
 $script:ODSDesktopFreeSpaceHeadroomGB = 1.5
 
@@ -55,6 +57,33 @@ try {
     Add-Content -LiteralPath (Join-Path $logs 'launch-api.log') -Encoding UTF8 -Value ('{0:o} {1}' -f (Get-Date), $message)
     exit 1
 }
+'@
+
+$script:ODSDesktopUninstallScript = @'
+# ODS Desktop uninstaller (Settings > Apps runs this). -KeepData or
+# -RemoveData answers the data question; -NonInteractive keeps the data.
+[CmdletBinding()]
+param([switch]$KeepData, [switch]$RemoveData, [switch]$NonInteractive)
+$ErrorActionPreference = 'Stop'
+foreach ($name in @('native-llama-runtime.ps1', 'desktop-runtime.ps1', 'desktop-api-launcher.ps1', 'app-shortcut.ps1', 'desktop-uninstall.ps1')) {
+    . (Join-Path (Join-Path $PSScriptRoot 'launcher') $name)
+}
+Write-Host ''
+Write-Host '  Removing ODS Desktop'
+$code = 0
+try {
+    $result = Invoke-ODSDesktopUninstall -Paths (Get-ODSDesktopPaths $PSScriptRoot) -KeepData:$KeepData -RemoveData:$RemoveData -NonInteractive:$NonInteractive
+    Write-Host '         Done: the ODS sign-in tasks, shortcuts and the Apps & Features entry are gone.'
+    foreach ($entry in $result.Removed) { Write-Host "         Deleted $($entry.Path) ($(Format-ODSDesktopBytes $entry.Bytes))" }
+    foreach ($entry in $result.Kept) { Write-Host "         Kept $($entry.Path) ($(Format-ODSDesktopBytes $entry.Bytes)); delete it yourself any time." }
+    Write-Host '         Chats you saved in the ODS window are kept by Microsoft Edge as site data for localhost, not in these folders.'
+    Write-Host '         To erase them: Edge Settings > Cookies and site permissions > Manage and delete cookies and site data > localhost.'
+} catch {
+    Write-Host "         Uninstall stopped: $($_.Exception.Message)"
+    $code = 1
+}
+if (-not $NonInteractive) { $null = Read-Host 'Press Enter to close' }
+exit $code
 '@
 
 function Write-ODSDesktopStage([int]$Step, [string]$Title, [string]$Detail) {
@@ -144,7 +173,8 @@ function Start-ODSDesktopModel($Existing, $Engine, $Selection, $Paths) {
     $plan = [ordered]@{ ExecutablePath = $Engine.Runtime.ExecutablePath; Port = $port; ModelsDir = (Get-ODSPortalModelsDir)
         ContextSize = $Selection.ContextSize; GgufFile = $Selection.GgufFile }
     $null = New-Item -ItemType Directory -Force -Path $Paths.Root
-    Write-ODSPrivateEnvFile -Path $Paths.RuntimeOwner -Content (@{ Task = (Get-ODSPortalRuntimeTaskName); Profile = 'windows-desktop' } | ConvertTo-Json -Compress)
+    $owner = @{ Task = (Get-ODSPortalRuntimeTaskName); RuntimeDir = (Get-ODSPortalRuntimeDir); Profile = 'windows-desktop' }
+    Write-ODSPrivateEnvFile -Path $Paths.RuntimeOwner -Content ($owner | ConvertTo-Json -Compress)
     Write-Host "         Loading $($Selection.GgufFile) on 127.0.0.1:$port ($($Selection.ContextSize) tokens of context)..."
     $null = Invoke-ODSPortalRuntimeCutover -Existing $Existing -Plan $plan -Options $options -ApiKey (Get-ODSPortalApiKey) `
         -KeepPort $keep -TaskDescription $script:ODSDesktopRuntimeTaskDescription
@@ -234,6 +264,18 @@ function Install-ODSDesktopApp($Paths, [string]$Dist, [int]$LlamaPort, $Settings
     return $apiPort
 }
 
+function Publish-ODSDesktopUninstaller($Paths, [string[]]$Shortcuts, [string]$ModelPath, [string]$EngineDir) {
+    # Settings > Apps lists ODS Desktop with its real size (the model is most
+    # of it); uninstall deletes only shortcuts that still match this record.
+    $records = @(Get-ODSPortalShortcutRecord -Paths $Shortcuts)
+    Write-ODSPrivateEnvFile -Path (Join-Path $Paths.Root 'shortcuts.json') -Content (ConvertTo-Json -InputObject $records -Depth 3 -Compress)
+    Write-ODSPrivateEnvFile -Path (Join-Path $Paths.Root 'uninstall.ps1') -Content $script:ODSDesktopUninstallScript
+    $manifest = [IO.File]::ReadAllText((Join-Path $SourceRoot 'manifest.json'), [Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json
+    $bytes = (Get-ODSDesktopFolderBytes $Paths.Root) + (Get-ODSDesktopFolderBytes $ModelPath) + (Get-ODSDesktopFolderBytes $EngineDir)
+    $icon = if (Test-Path -LiteralPath $Paths.Icon -PathType Leaf) { $Paths.Icon } else { '' }
+    $null = Register-ODSDesktopUninstallEntry -Paths $Paths -Version ([string]$manifest.release.version) -Bytes $bytes -IconPath $icon
+}
+
 function Install-ODSDesktop {
     param([bool]$NonInteractive, [bool]$Repair, [int]$Port, [string]$DashboardDist, [bool]$NoShortcut)
     $paths = Get-ODSDesktopPaths
@@ -285,12 +327,14 @@ function Install-ODSDesktop {
         try { $shortcuts = @(Publish-ODSDesktopShortcut -Paths $paths -Port $apiPort -IconSource $icon) }
         catch { Write-Warning "The ODS shortcut could not be created: $($_.Exception.Message)" }
     }
+    Publish-ODSDesktopUninstaller $paths $shortcuts (Join-Path (Get-ODSPortalModelsDir) $selection.GgufFile) $engine.Runtime.Directory
 
     Write-Host ''
     Write-Host '  ODS is ready.'
     if ($shortcuts.Count) { Write-Host '         Open it with the ODS icon on your desktop or in the Start menu.' }
     Write-Host "         Address: http://localhost:$apiPort/"
     Write-Host "         To repair or update later: $(Format-ODSDesktopCommand $PSCommandPath)"
+    Write-Host '         To remove it: Settings > Apps > Installed apps > ODS Desktop (preview).'
     if (-not $NoShortcut -and -not $NonInteractive -and $shortcuts.Count) { Start-Process -FilePath $shortcuts[0] }
     return 0
 }
