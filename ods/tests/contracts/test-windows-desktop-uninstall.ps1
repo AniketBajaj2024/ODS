@@ -131,6 +131,11 @@ try {
     Check (-not (Test-Path -LiteralPath $install.Paths.Root) -and -not (Test-Path -LiteralPath (Join-Path $install.Base 'ODS\lemonade')) -and
         -not (Test-Path -LiteralPath (Join-Path $install.Base 'ODS\llama.cpp')) -and $result.Kept.Count -eq 0) 'remove everything leaves no ODS Desktop folder, model, engine or empty parent behind'
     Check (-not (Test-Path -LiteralPath (Join-Path $install.Base 'ODS'))) 'with nothing else of ODS left, the shortcut icon and the ODS folder go too'
+    $install = New-Install 'remove-desktop-only'
+    [IO.File]::Delete((Join-Path $install.Models 'Portal-model.gguf'))
+    [IO.File]::Delete((Join-Path $install.Base 'ODS\ods-app.ico'))
+    $result = Invoke-Case $install @{ RemoveData = $true }
+    Check (-not (Test-Path -LiteralPath (Join-Path $install.Base 'ODS'))) 'on a PC without the shared icon, no empty ODS folder is left behind'
 
     # --- The owner is asked, and shown what is at stake -------------------------
     $install = New-Install 'ask'

@@ -173,11 +173,12 @@ function Remove-ODSDesktopLeftovers($Paths, [string[]]$Folders) {
     }
     if (-not @(Get-ChildItem -LiteralPath $Paths.Root -Force).Count) { Remove-Item -LiteralPath $Paths.Root -Force }
     # The app shortcut's icon copy (app-shortcut.ps1) is shared with the WSL
-    # Portal's shortcut; it goes only when it is all that is left of ODS.
+    # Portal's shortcut; it goes only when it is all that is left of ODS. A
+    # Desktop-only PC never has it, so an empty ODS folder goes as well.
     $ods = Split-Path -Parent $Paths.Root
     if (Test-Path -LiteralPath $ods -PathType Container) {
         $rest = @(Get-ChildItem -LiteralPath $ods -Force)
-        if ($rest.Count -eq 1 -and $rest[0].Name -ceq 'ods-app.ico') { Remove-Item -LiteralPath $ods -Recurse -Force }
+        if ($rest.Count -eq 0 -or ($rest.Count -eq 1 -and $rest[0].Name -ceq 'ods-app.ico')) { Remove-Item -LiteralPath $ods -Recurse -Force }
     }
 }
 
