@@ -179,7 +179,9 @@ function Get-ODSDesktopModelDownloadBytes($Selection, $Config, [string]$ModelsDi
     $remaining = [long]$Config.ModelSizeMB * 1MB
     $partial = "$target.partial"
     if (Test-Path -LiteralPath $partial -PathType Leaf) { $remaining -= (Get-Item -LiteralPath $partial).Length }
-    return [long][math]::Max(0, $remaining)
+    # [long]0: Windows PowerShell picks Max(int, int) for a bare 0 and fails
+    # on any model over 2 GB.
+    return [math]::Max([long]0, $remaining)
 }
 
 function Resolve-ODSDesktopContextSize([int]$CatalogContext, [int]$Cap = $script:ODSDesktopCpuContextCap) {
