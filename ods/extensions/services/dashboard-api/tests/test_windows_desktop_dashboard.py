@@ -10,6 +10,8 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
 API_DIR = Path(__file__).resolve().parent.parent
 
 _PROBE = textwrap.dedent(
@@ -74,3 +76,38 @@ def test_desktop_profile_serves_the_dashboard_behind_its_gate(tmp_path):
         assert probe[refused]["status"] == 401 and probe[refused]["signIn"] == "required"
     # An unknown API path is an API 404, never the dashboard's index.html.
     assert probe["unknown_api"]["status"] == 404 and "ODS dashboard" not in probe["unknown_api"]["body"]
+
+# `python main.py` with uvicorn.run caught, so no listener opens.
+_ENTRYPOINT_PROBE = textwrap.dedent(
+    """
+    import json, runpy, sys
+    from pathlib import Path
+    sys.path.insert(0, sys.argv[1])
+    import uvicorn
+    calls = []
+    uvicorn.run = lambda app, **options: calls.append(options)
+    runpy.run_path(str(Path(sys.argv[1]) / "main.py"), run_name="__main__")
+    print(json.dumps(calls))
+    """
+)
+
+
+@pytest.mark.parametrize("profile, host", [("windows-desktop", "127.0.0.1"), ("compose", "0.0.0.0")])
+def test_direct_entrypoint_binds_the_profile_host(tmp_path, profile, host):
+    env = {
+        **os.environ,
+        "ODS_RUNTIME_PROFILE": profile,
+        "ODS_DATA_DIR": str(tmp_path / "data"),
+        "ODS_INSTALL_DIR": str(tmp_path / "install"),
+        "ODS_EXTENSIONS_DIR": str(API_DIR.parent),
+        "DASHBOARD_API_KEY": "entrypoint-probe-key",
+        "DASHBOARD_API_PORT": "3101",
+        "ODS_NATIVE_LLM_URL": "http://127.0.0.1:18080",
+        "ODS_NATIVE_LLM_RUNTIME_DIR": str(tmp_path / "portal-runtime"),
+    }
+    env.pop("GPU_BACKEND", None)
+    result = subprocess.run([sys.executable, "-c", _ENTRYPOINT_PROBE, str(API_DIR)],
+                            capture_output=True, text=True, env=env, timeout=120)
+    assert result.returncode == 0, result.stderr[-4000:]
+    calls = json.loads(result.stdout.strip().splitlines()[-1])
+    assert calls == [{"host": host, "port": 3101}]

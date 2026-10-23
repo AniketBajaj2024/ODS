@@ -25,6 +25,11 @@ def test_desktop_profile_has_no_host_agent_or_child_processes():
     assert not profile.child_processes
 
 
+def test_desktop_listens_on_loopback_and_compose_on_every_interface():
+    assert parse(DESKTOP).listen_host == "127.0.0.1"
+    assert parse({}).listen_host == "0.0.0.0"
+
+
 def test_unknown_profile_is_refused():
     with pytest.raises(RuntimeProfileError, match="not one of"):
         parse({"ODS_RUNTIME_PROFILE": "windows"})
