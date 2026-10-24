@@ -95,6 +95,8 @@ try {
     [IO.File]::WriteAllBytes($model, [byte[]]::new(4MB - 1))
     Check ((Get-ODSDesktopModelDownloadBytes $fresh $config $store) -eq 4MB) 'a model changed since it was verified needs space for a fresh copy'
     Check ((Get-ODSDesktopModelDownloadBytes ([pscustomobject]@{ GgufFile = 'Other.gguf'; Carried = $true }) $config $store) -eq 0) 'a rerun that keeps the owner''s own model downloads nothing'
+    $catalogSize = [pscustomobject]@{ ModelSizeMB = 2741; GgufSha256 = ('AB' * 32) }
+    Check ((Get-ODSDesktopModelDownloadBytes ([pscustomobject]@{ GgufFile = 'Qwen3.5-4B-Q4_K_M.gguf'; Carried = $false }) $catalogSize $store) -eq 2741MB) 'a real catalog model over 2 GB is sized without overflowing'
 
     # --- CPU options through main's builder ------------------------------------
     $runtime = [pscustomobject]@{ ExecutablePath = 'C:\ODS\llama.cpp\b9014-win-vulkan-x64\llama-server.exe'; ReleaseTag = 'b9014'; ZipSha256 = ('c' * 64) }

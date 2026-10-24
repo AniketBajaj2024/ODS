@@ -2028,4 +2028,4 @@ if RUNTIME_PROFILE.is_desktop:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DASHBOARD_API_PORT", "3002")))
+    uvicorn.run(app, host=RUNTIME_PROFILE.listen_host, port=int(os.environ.get("DASHBOARD_API_PORT", "3002")))
