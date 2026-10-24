@@ -171,6 +171,16 @@ jobs:
         shell: powershell
         run: ./tests/contracts/test-windows-native-llama-cuda-runtime.ps1
 
+      - name: Windows Desktop Update Contract (PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/contracts/test-windows-desktop-update.ps1
+
+      - name: Windows Desktop Update Contract (Windows PowerShell)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/contracts/test-windows-desktop-update.ps1
+
       - name: Windows RTX Spark Memory Contracts (PowerShell 7)
         shell: pwsh
         run: |
