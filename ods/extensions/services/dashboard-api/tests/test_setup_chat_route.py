@@ -173,3 +173,53 @@ def test_invalid_routes_fail_without_network_or_secret_details(test_client, monk
     assert result.status_code == 503
     assert result.json()['detail'] == 'Invalid LLM route configuration'
     session.assert_not_called()
+
+
+def test_compose_chat_payload_keeps_the_model_key_as_before(test_client, monkeypatch, tmp_path):
+    # The Desktop branch must not change the Compose request: upstream always sends "model".
+    monkeypatch.setattr(config, "INSTALL_DIR", str(tmp_path))
+    (tmp_path / ".env").write_text("LLM_API_URL=http://llama-server:8080\nLLM_MODEL=\n", encoding="utf-8")
+    response = MagicMock(status=200)
+    response.json = AsyncMock(return_value={"choices": [{"message": {"content": "ready"}}]})
+    post = MagicMock()
+    post.__aenter__ = AsyncMock(return_value=response)
+    post.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.post.return_value = post
+    context = MagicMock()
+    context.__aenter__ = AsyncMock(return_value=session)
+    context.__aexit__ = AsyncMock(return_value=False)
+    monkeypatch.setattr(setup.aiohttp, "ClientSession", lambda **kwargs: context)
+
+    result = test_client.post("/api/chat", json={"message": "hello", "system": "Be brief"}, headers=test_client.auth_headers)
+    assert result.status_code == 200
+    assert "model" in session.post.call_args.kwargs["json"]
+
+
+def test_desktop_chat_payload_omits_the_model_key(monkeypatch, tmp_path):
+    # The Desktop llama-server serves one model and takes no model name, so an
+    # empty "model" must not be sent. Exercised directly, since the Desktop
+    # profile is not the one this test process started with.
+    import native_llm
+    from types import SimpleNamespace
+    native = native_llm.NativeLlm("http://127.0.0.1:8080", tmp_path)
+    monkeypatch.setattr(setup.native_llm, "configured", lambda: native)
+    monkeypatch.setattr(setup.native_llm, "headers", lambda llm: {"Authorization": "Bearer k"})
+    monkeypatch.setattr(setup, "get_active_persona_prompt", lambda: "persona")
+    response = MagicMock(status=200)
+    response.json = AsyncMock(return_value={"choices": [{"message": {"content": "ready"}}]})
+    post = MagicMock()
+    post.__aenter__ = AsyncMock(return_value=response)
+    post.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.post.return_value = post
+    context = MagicMock()
+    context.__aenter__ = AsyncMock(return_value=session)
+    context.__aexit__ = AsyncMock(return_value=False)
+    monkeypatch.setattr(setup.aiohttp, "ClientSession", lambda **kwargs: context)
+
+    import asyncio
+    asyncio.run(setup.chat(setup.ChatRequest(message="hello", system="Be brief"), api_key="x"))
+    sent = session.post.call_args.kwargs["json"]
+    assert "model" not in sent
+    assert session.post.call_args.args == ("http://127.0.0.1:8080/v1/chat/completions",)

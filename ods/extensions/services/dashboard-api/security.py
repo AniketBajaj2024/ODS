@@ -8,6 +8,10 @@ from pathlib import Path
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+# Importing the profile validates it: the Desktop profile refuses to start
+# without its key, so the generated-key fallback below is Compose-only.
+from runtime_profile import RUNTIME_PROFILE  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 DASHBOARD_API_KEY = os.environ.get("DASHBOARD_API_KEY")
