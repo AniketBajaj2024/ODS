@@ -242,6 +242,8 @@ try {
         # must stop at its first check, naming the right window.
         $output = (& $x86 -NoProfile -ExecutionPolicy Bypass -File $scripts[0] -NonInteractive 2>&1 | Out-String)
         Check ($LASTEXITCODE -eq 1 -and $output -match 'Windows PowerShell \(x86\)' -and $output -match 'the one without x86') 'setup in 32-bit PowerShell stops and names the 64-bit window to use'
+        # The child's exit code is its own; do not let it become this script's.
+        $global:LASTEXITCODE = 0
     }
     $entry = [IO.File]::ReadAllText($scripts[0])
     Check ($entry -match 'Test-ODSDesktopElevated\)\s*\{\s*throw') 'setup refuses to run elevated, so no ODS state is ever owned by Administrators'
