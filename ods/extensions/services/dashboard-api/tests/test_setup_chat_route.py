@@ -201,8 +201,7 @@ def test_desktop_chat_payload_omits_the_model_key(monkeypatch, tmp_path):
     # empty "model" must not be sent. Exercised directly, since the Desktop
     # profile is not the one this test process started with.
     import native_llm
-    from types import SimpleNamespace
-    native = native_llm.NativeLlm("http://127.0.0.1:8080", tmp_path)
+    native =native_llm.NativeLlm("http://127.0.0.1:8080", tmp_path)
     monkeypatch.setattr(setup.native_llm, "configured", lambda: native)
     monkeypatch.setattr(setup.native_llm, "headers", lambda llm: {"Authorization": "Bearer k"})
     monkeypatch.setattr(setup, "get_active_persona_prompt", lambda: "persona")
