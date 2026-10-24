@@ -43,6 +43,11 @@ class RuntimeProfile:
         """Desktop runs windowless; a console child would flash on screen."""
         return not self.is_desktop
 
+    @property
+    def listen_host(self) -> str:
+        """Desktop serves this PC only; Compose publishes through Docker."""
+        return "127.0.0.1" if self.is_desktop else "0.0.0.0"
+
 
 def is_loopback_host(host: str) -> bool:
     """True for a name or address that can only mean this computer."""
